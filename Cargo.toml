@@ -1,0 +1,26 @@
+[package]
+name = "cronjob-manager"
+version = "0.1.0"
+edition = "2024"
+description = "A desktop GUI application for managing cron jobs on Linux"
+license = "MIT"
+publish = false
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+eframe = "0.30"
+egui = "0.30"
+libc = "0.2"
+thiserror = "2"
+
+[lib]
+# The project has no doctests; disabling them also works around a local
+# rustdoc/cargo mismatch where `--check-cfg` requires `-Z unstable-options`.
+doctest = false
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[profile.release]
+lto = "thin"
+strip = "symbols"
