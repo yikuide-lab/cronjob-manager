@@ -20,9 +20,39 @@ A desktop GUI application written in Rust for managing cron jobs on Linux system
 
 ## Requirements
 
-- Rust 1.85+ (edition 2024)
-- Linux with `crontab` and `cron` installed
+- Linux with a cron implementation installed (Debian/Ubuntu `cron`, RHEL-family `cronie`, Arch `cronie`/`busybox` crontab are all supported)
+- Rust 1.88+ (edition 2024; enforced via `rust-version` in Cargo.toml)
 - A display server or `Xvfb` for headless environments
+
+## Supported platforms
+
+The project is a desktop Linux tool; CI tests it on:
+
+| Platform | Toolchain | How |
+|---|---|---|
+| Ubuntu 22.04 / 24.04 LTS | stable | GitHub runner |
+| Debian 12 (bookworm) | stable | container |
+| AlmaLinux 9 (RHEL family) | stable | container |
+| Fedora (latest) | stable | container |
+| Arch Linux | distro rust | container |
+| MSRV check | Rust 1.88 | GitHub runner |
+
+Packaging artifacts are produced for every release: a `.deb` (Debian/Ubuntu and derivatives), an `.rpm` (RHEL/Fedora/openSUSE family), and a static-ish x86_64 binary. Arch users can build from [`packaging/aur/PKGBUILD`](packaging/aur/PKGBUILD).
+
+## Install
+
+```bash
+# Debian / Ubuntu (and derivatives)
+sudo apt install ./cronjob-manager_*_amd64.deb
+
+# Fedora / RHEL / openSUSE
+sudo dnf install ./cronjob-manager-*.x86_64.rpm
+
+# Any distro with Rust 1.88+
+cargo install --git https://github.com/yikuide-lab/cronjob-manager
+```
+
+Grab release artifacts from the [Releases](https://github.com/yikuide-lab/cronjob-manager/releases) page.
 
 ## Build
 

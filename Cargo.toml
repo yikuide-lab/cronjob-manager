@@ -2,8 +2,11 @@
 name = "cronjob-manager"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.88"
 description = "A desktop GUI application for managing cron jobs on Linux"
 license = "MIT"
+repository = "https://github.com/yikuide-lab/cronjob-manager"
+readme = "README.md"
 publish = false
 
 [dependencies]
@@ -24,3 +27,25 @@ all = { level = "warn", priority = -1 }
 [profile.release]
 lto = "thin"
 strip = "symbols"
+
+# `cargo deb` packaging metadata (maintainer tools only, not part of the build).
+[package.metadata.deb]
+maintainer = "yikuide-lab <yikuide-lab@users.noreply.github.com>"
+copyright = "2026 yikuide-lab"
+extended-description-file = "README.md"
+depends = "$auto"
+section = "admin"
+priority = "optional"
+assets = [
+    ["target/release/cronjob-manager", "usr/bin/", "755"],
+    ["README.md", "usr/share/doc/cronjob-manager/", "644"],
+    ["LICENSE", "usr/share/doc/cronjob-manager/", "644"],
+]
+
+# `cargo generate-rpm` packaging metadata.
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/cronjob-manager", dest = "/usr/bin/cronjob-manager", mode = "755" },
+    { source = "README.md", dest = "/usr/share/doc/cronjob-manager/README.md", mode = "644" },
+    { source = "LICENSE", dest = "/usr/share/doc/cronjob-manager/LICENSE", mode = "644" },
+]

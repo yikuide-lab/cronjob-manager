@@ -3,13 +3,14 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,8 +21,6 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      # GUI stack (eframe/winit) loads X11/Wayland at runtime via dlopen, but
-      # a few build-time headers keep the build robust across runner images.
       - name: Install GUI build dependencies
         run: |
           sudo apt-get update
@@ -34,5 +33,163 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
 
+  test:
+    name: test (${{ matrix.os }}, stable)
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install GUI build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libxkbcommon-dev libwayland-dev libxcb1-dev
+
       - name: Test
         run: cargo test
+
+  msrv:
+    name: test (ubuntu-latest, rust ${{ matrix.toolchain }})
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: ['1.88', 'stable']
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install GUI build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libxkbcommon-dev libwayland-dev libxcb1-dev
+
+      - name: Test on MSRV
+        run: cargo test
+
+  distro:
+    name: test (${{ matrix.image }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # Covers the major cron implementations: Debian/Ubuntu (vixie-derived
+        # cron), RHEL-family (cronie: Alma 9 / Fedora), Arch (cronie/busybox).
+        image: [debian:bookworm, almalinux:9, fedora:latest, archlinux:base-devel]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: cargo test in ${{ matrix.image }} container
+        run: |
+          docker run --rm -v "$PWD":/work -w /work ${{ matrix.image }} bash -lc '
+            set -euo pipefail
+            case "${{ matrix.image }}" in
+              debian:bookworm)
+                apt-get update -qq
+                apt-get install -y -qq --no-install-recommends \
+                  ca-certificates curl gcc libc6-dev pkg-config \
+                  libxkbcommon-dev libwayland-dev libxcb1-dev
+                ;;
+              almalinux:9|fedora:latest)
+                dnf -y -q install \
+                  ca-certificates curl gcc gcc-c++ pkgconf-pkg-config \
+                  libxkbcommon-devel wayland-devel libxcb-devel
+                ;;
+              archlinux:base-devel)
+                pacman -Sy --noconfirm --needed rust libxkbcommon wayland libxcb
+                ;;
+            esac
+            if ! command -v cargo >/dev/null 2>&1; then
+              curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs \
+                | sh -s -- -y --profile minimal --default-toolchain stable
+              . "$HOME/.cargo/env"
+            fi
+            cargo test --quiet
+          '
+
+  package:
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install GUI build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libxkbcommon-dev libwayland-dev libxcb1-dev
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deb,cargo-generate-rpm
+
+      - name: Build .deb and .rpm packages
+        run: |
+          cargo build --release
+          cargo deb
+          cargo generate-rpm
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: |
+            target/debian/*.deb
+            target/generate-rpm/*.rpm
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [lint, test, msrv, distro]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install GUI build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libxkbcommon-dev libwayland-dev libxcb1-dev
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deb,cargo-generate-rpm
+
+      - name: Build release artifacts
+        run: |
+          cargo build --release
+          cargo deb
+          cargo generate-rpm
+          VER="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          cp target/release/cronjob-manager "dist/cronjob-manager-${VER}-x86_64-unknown-linux-gnu"
+          cp target/debian/*.deb dist/
+          cp target/generate-rpm/*.rpm dist/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: dist/*
