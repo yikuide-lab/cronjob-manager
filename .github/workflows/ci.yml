@@ -13,13 +13,15 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: lint
 
       - name: Install GUI build dependencies
         run: |
@@ -41,11 +43,13 @@ jobs:
         os: [ubuntu-22.04, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: test-${{ matrix.os }}
 
       - name: Install GUI build dependencies
         run: |
@@ -64,13 +68,15 @@ jobs:
         toolchain: ['1.88', 'stable']
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain }}
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: msrv-${{ matrix.toolchain }}
 
       - name: Install GUI build dependencies
         run: |
@@ -91,7 +97,7 @@ jobs:
         image: [debian:bookworm, almalinux:9, fedora:latest, archlinux:base-devel]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: cargo test in ${{ matrix.image }} container
         run: |
@@ -105,8 +111,10 @@ jobs:
                   libxkbcommon-dev libwayland-dev libxcb1-dev
                 ;;
               almalinux:9|fedora:latest)
+                # EL/Fedora minimal images ship curl (curl-minimal on EL9),
+                # so installing the full curl package would conflict.
                 dnf -y -q install \
-                  ca-certificates curl gcc gcc-c++ pkgconf-pkg-config \
+                  ca-certificates gcc gcc-c++ pkgconf-pkg-config \
                   libxkbcommon-devel wayland-devel libxcb-devel
                 ;;
               archlinux:base-devel)
@@ -125,11 +133,13 @@ jobs:
     needs: [lint, test]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: package
 
       - name: Install GUI build dependencies
         run: |
@@ -162,11 +172,13 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: package
 
       - name: Install GUI build dependencies
         run: |
