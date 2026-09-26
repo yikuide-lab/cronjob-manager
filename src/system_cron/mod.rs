@@ -12,8 +12,9 @@ use crate::error::Result;
 ///
 /// Writes to a sibling dot-prefixed temp file first (so cron.d tooling
 /// ignores it), syncs it, then renames over the target — a crash mid-write
-/// can never truncate the target. Permissions of an existing file are
-/// preserved; new files get 0644.
+/// can never truncate the target. The parent directory is fsynced so the
+/// rename itself survives a power loss. Permissions of an existing file
+/// are preserved; new files get 0644.
 pub(crate) fn write_atomic(path: &Path, contents: &str) -> Result<()> {
     let tmp = temp_path(path);
     let mode = fs::metadata(path)
@@ -34,6 +35,14 @@ pub(crate) fn write_atomic(path: &Path, contents: &str) -> Result<()> {
     drop(file);
 
     fs::rename(&tmp, path)?;
+
+    // Best effort: make the rename durable. Only fails on exotic
+    // filesystems, where a plain rename has the same weakness anyway.
+    if let Some(dir) = path.parent()
+        && let Ok(dir_file) = fs::File::open(dir)
+    {
+        let _ = dir_file.sync_all();
+    }
     Ok(())
 }
 
