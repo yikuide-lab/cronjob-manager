@@ -1,5 +1,7 @@
 # Cron Job Manager
 
+![CI](https://github.com/yikuide-lab/cronjob-manager/actions/workflows/ci.yml/badge.svg)
+
 A desktop GUI application written in Rust for managing cron jobs on Linux systems. It supports viewing and editing both the current user's crontab and system-level cron entries (`/etc/crontab` and `/etc/cron.d/`).
 
 ## Features
